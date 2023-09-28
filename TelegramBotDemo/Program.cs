@@ -66,6 +66,7 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using TelegramBotDemo;
 using VideoLibrary;
 
@@ -98,8 +99,45 @@ Console.ReadLine();
 // Send cancellation request to stop bot
 cts.Cancel();
 
+
+
+
+
+
+
 async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
 {
+    InlineKeyboardMarkup inlineKeyboard = new(new[]
+{
+    new[]
+    {
+        InlineKeyboardButton.WithCallbackData(text:"1.1", callbackData:"11"),
+        InlineKeyboardButton.WithCallbackData(text:"1.2", callbackData:"12"),
+    },
+    new []
+    {
+        InlineKeyboardButton.WithCallbackData(text: "2.1", callbackData: "21"),
+        InlineKeyboardButton.WithCallbackData(text: "2.2", callbackData: "22"),
+    },
+    new[]
+    {
+        InlineKeyboardButton.WithSwitchInlineQuery(text:"switch inline query"),
+        InlineKeyboardButton.WithSwitchInlineQueryCurrentChat(
+            text:"switch to next query in chat"),
+
+    }
+
+});
+    ReplyKeyboardMarkup replyKeyboardMarkup = new(new[]
+    {
+        new KeyboardButton[] { "Help me", "Call me ☎️" },
+    })
+    {
+        ResizeKeyboard = true
+    };
+
+
+
     // Only process Message updates: https://core.telegram.org/bots/api#message
     if (update.Message is not { } message)
         return;
@@ -110,7 +148,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
     var chatId = message.Chat.Id;
 
     Console.WriteLine($"Received a '{messageText}' message in chat {chatId}.");
-
+    await Console.Out.WriteLineAsync(messageText);
     /*
     // Echo received message text
     Message sentMessage = await botClient.SendTextMessageAsync(
@@ -153,11 +191,21 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
             $"{message.Chat.Bio}\n" +
             $"{message.Chat.FirstName} " +
             $"{message.Chat.LastName}",
+            replyMarkup:inlineKeyboard,
             cancellationToken: cancellationToken);
 
 
 
             //FolderSearch.SearchForFolder();
+        }
+        else if(messageText=="/singleline")
+        {
+            Message sentMessage = await botClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: "single line buttons",
+                replyMarkup: replyKeyboardMarkup,
+                cancellationToken:cancellationToken
+                );
         }
 
         //youtube dagi videoni olish
