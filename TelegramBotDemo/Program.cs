@@ -1,7 +1,4 @@
-﻿
-
-//6076037138:AAEhpp31iSK3c1X6bogk9afnMiOKpEJoY7o
-using Telegram.Bot;
+﻿using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -12,99 +9,188 @@ using TelegramBotDemo;
 using TelegramBotDemo.Models;
 using VideoLibrary;
 
-string TOKEN = "5911983733:AAEOQv0cQy5ITnaOUdYRRZDBywcEvRpgbms";
-var botClient = new TelegramBotClient(TOKEN);
-var myBot = await botClient.GetMeAsync();
-Console.WriteLine(myBot);
-
-
-using CancellationTokenSource cts = new();
-
-// StartReceiving does not block the caller thread. Receiving is done on the ThreadPool.
-ReceiverOptions receiverOptions = new()
+namespace TelegramBotDemo
 {
-    AllowedUpdates = Array.Empty<UpdateType>() // receive all update types except ChatMember related updates
-};
-
-botClient.StartReceiving(
-    updateHandler: HandleUpdateAsync,
-    pollingErrorHandler: HandlePollingErrorAsync,
-    receiverOptions: receiverOptions,
-    cancellationToken: cts.Token
-);
-
-var me = await botClient.GetMeAsync();
-
-Console.WriteLine($"Start listening for @{me.Username}");
-Console.ReadLine();
-
-// Send cancellation request to stop bot
-cts.Cancel();
-
-
-
-
-
-
-
-async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
-{
-    //return;
-    var handler = update.Type switch
+    public class Program
     {
-        UpdateType.CallbackQuery => HandleCallBackQuery(botClient, update, cancellationToken)
+        static ITelegramBotClient botClient;
+        static Dictionary<long, int> userPageTracker = new Dictionary<long, int>();
+        static CancellationTokenSource cts;
 
-    };
-
-    try
-    {
-        //handler();
-    }
-    catch
-    {
-        Console.WriteLine();
-    }
-
-    InlineKeyboardMarkup inlineKeyboard = new(new[]
-    {
-        new[]
+        static async Task Main(string[] args)
         {
-            InlineKeyboardButton.WithCallbackData(text:"1.1", callbackData:"11"),
-            InlineKeyboardButton.WithCallbackData(text:"1.2", callbackData:"12"),
-        },
-        new []
-        {
-            InlineKeyboardButton.WithCallbackData(text: "prev", callbackData: "prev"),
-            InlineKeyboardButton.WithCallbackData(text: "next", callbackData: "next"),
-        },
-        new[]
-        {
-            InlineKeyboardButton.WithSwitchInlineQuery(text:"switch inline query"),
-            InlineKeyboardButton.WithSwitchInlineQueryCurrentChat(
-                text:"switch to next query in chat"),
+            const string TOKEN = "5911983733:AAEOQv0cQy5ITnaOUdYRRZDBywcEvRpgbms";
+            botClient = new TelegramBotClient(TOKEN);
+
+            var myBot = await botClient.GetMeAsync();
+            Console.WriteLine($"Start listening for @{myBot.Username}");
+
+            cts = new();
+
+            botClient.StartReceiving(
+                updateHandler: HandleUpdateAsync,
+                pollingErrorHandler: HandlePollingErrorAsync,
+                receiverOptions: receiverOptions,
+                cancellationToken: cts.Token
+                );
+
+            Console.ReadLine();
+
+            // Send cancellation request to stop bot
+            cts.Cancel();
 
         }
-    });
-    ReplyKeyboardMarkup replyKeyboardMarkup = new(new[]
-    {
-        new KeyboardButton[] { "Help me", "Call me ☎️" },
-    }){
-        ResizeKeyboard = true
-    };
-    
+
+        // StartReceiving does not block the caller thread. Receiving is done on the ThreadPool.
+        static ReceiverOptions receiverOptions = new()
+        {
+            AllowedUpdates = Array.Empty<UpdateType>() // receive all update types except ChatMember related updates
+        };
+
+        static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            var handler = update.Type switch
+            {
+                UpdateType.Message => HandleMessageAsync(botClient, update, cancellationToken),
+                UpdateType.Unknown => throw new NotImplementedException(),
+                UpdateType.InlineQuery => throw new NotImplementedException(),
+                UpdateType.ChosenInlineResult => throw new NotImplementedException(),
+                UpdateType.CallbackQuery => HandleUpdateQueryAsync(botClient, update, cancellationToken),
+                UpdateType.EditedMessage => throw new NotImplementedException(),
+                UpdateType.ChannelPost => throw new NotImplementedException(),
+                UpdateType.EditedChannelPost => throw new NotImplementedException(),
+                UpdateType.ShippingQuery => throw new NotImplementedException(),
+                UpdateType.PreCheckoutQuery => throw new NotImplementedException(),
+                UpdateType.Poll => throw new NotImplementedException(),
+                UpdateType.PollAnswer => throw new NotImplementedException(),
+                UpdateType.MyChatMember => throw new NotImplementedException(),
+                UpdateType.ChatMember => throw new NotImplementedException(),
+                UpdateType.ChatJoinRequest => throw new NotImplementedException(),
+            };
+        }
+
+        static async Task HandleMessageAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+
+            if (update.Message is not { } message)
+                return;
+            // Only process text messages
+            if (message.Text is not { } messageText)
+                return;
+            var chatId = message.Chat.Id;
+
+            if (messageText == "/music")
+            {
+                userPageTracker[chatId] = 1;
+                UpdateQueryResults(chatId, null, 1);
+            }
+        }
+        static void UpdateQueryResults(long chatId, int? messageId, int page)
+        {
+            var resultsPerPage = 10;
+
+            var startIndex = (page - 1) * resultsPerPage;
+            var endIndex = startIndex + resultsPerPage;
+
+            ApiInfo api = FileService.GetApiInfo();
+
+            var resultToSend = new List<InlineQueryResult>();
+
+            api.entries.Skip(startIndex).Take(resultsPerPage).ToList().ForEach(result =>
+                resultToSend.Add(
+                    item: new InlineQueryResultArticle(
+                        id: result.API, title: $"Page {page}",
+                        inputMessageContent: new InputTextMessageContent($"{result.HTTPS}"))
+                    {
+                        Description = result.Description,
+                    }));
+            var inlineKeyboard = new InlineKeyboardMarkup(new[]
+            {
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("Previous", $"prev_{page}"),
+                    InlineKeyboardButton.WithCallbackData("Next", $"next_{page}")
+                }
+            });
+
+            if (messageId.HasValue)
+            {
+                botClient.EditMessageReplyMarkupAsync(chatId, messageId.Value, inlineKeyboard);
+                botClient.EditMessageTextAsync(chatId, messageId.Value, $"Showing Page {page}:", replyMarkup: inlineKeyboard);
+            }
+            else
+            {
+                botClient.AnswerInlineQueryAsync(
+                    chatId.ToString(),
+                    results: resultToSend,
+                    isPersonal: true,
+                    cacheTime: 0
+                    );
+                botClient.SendTextMessageAsync(
+                    chatId,
+                    $"Showing Page {page}",
+                    replyMarkup: inlineKeyboard);
+            }
+
+        }
+        static async Task HandleUpdateQueryAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            if (update.CallbackQuery.Data == null)
+                return;
+            var callbackQuery = update.CallbackQuery;
+            var chatId = callbackQuery.Message.Chat.Id;
+            var messageId = callbackQuery.Message.MessageId;
+            var callbackData = callbackQuery.Data;
+
+            if(callbackData.StartsWith("next_"))
+            {
+                var currentPage = GetCurrentPage(chatId);
+                var nextPage = currentPage + 1;
+                UpdateQueryResults(chatId, messageId, nextPage);
+            }
+            else if(callbackData.StartsWith("prev_"))
+            {
+                var currentPage = GetCurrentPage(chatId);
+                var nextPage = currentPage - 1;
+                UpdateQueryResults(chatId, messageId, nextPage);
+            }
+        }
+        static int GetCurrentPage(long chatId)
+        {
+            if(userPageTracker.ContainsKey(chatId))
+            {
+                return userPageTracker[chatId];
+            }
+            return 1;
+        }
+
+        static async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+        {
+            var ErrorMessage = exception switch
+            {
+                ApiRequestException apiRequestException
+                    => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+                _ => exception.ToString()
+            };
+
+            Console.WriteLine(ErrorMessage);
+            _ = Task.CompletedTask;
+        }
+    }
+}
 
 
-    // Only process Message updates: https://core.telegram.org/bots/api#message
-    if (update.Message is not { } message)
-        return;
-    // Only process text messages
-    if (message.Text is not { } messageText)
-        return;
 
-    var chatId = message.Chat.Id;
 
-    Console.WriteLine($"Received a '{messageText}' message in chat {chatId}.");
-    await Console.Out.WriteLineAsync(messageText);
+
+
+
+
+
+
+
+
+
     #region sandbox
     /*
     
@@ -132,27 +218,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
         cancellationToken: cancellationToken);
     */
     #endregion
-    try
-    {
-        CallbackQuery callbackQuery = new CallbackQuery();
-        string call = callbackQuery.Data;
-        //salomlashish
-        if (messageText == "/start")
-        {
-
-            await botClient.AnswerInlineQueryAsync(chatId, )
-
-            Message sentMessage = await botClient.SendTextMessageAsync(
-            chatId: chatId,
-            text: $"Salom {update.Message.ForwardSenderName}\n" +
-            $"{message.Chat.Bio}\n" +
-            $"{message.Chat.FirstName} " +
-            $"{message.Chat.LastName}",
-            replyMarkup: inlineKeyboard,
-            cancellationToken: cancellationToken);
-
-            //FolderSearch.SearchForFolder();
-        }
+/*
         else if (messageText == "/singleline")
         {
             Message sentMessage = await botClient.SendTextMessageAsync(
@@ -196,7 +262,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
                 *//*FileSaver fileSaver = new FileSaver("instagramfile", stream);
                 fileSaver.Save();*//*
 
-            }*/
+            }*//*
             await botClient.SendVideoAsync(update.Message.Chat.Id, video: "https://dd" + newText);
 
 
@@ -204,18 +270,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
 
         else if (update.CallbackQuery?.Data=="next")
         {
-            ApiInfo api = FileService.GetApiInfo();
-
-            int offset = int.Parse(update.InlineQuery.Offset ?? "0");
-            int resultsPerRequest = 10;
-            var resultsToSend = new List<InlineQueryResult>();
-
-            api.entries.Skip(offset).Take(resultsPerRequest).ToList().ForEach(result =>
-                resultsToSend.Add(
-                    item: new InlineQueryResultArticle(id:update.InlineQuery.Id,title:"Natija", inputMessageContent: null)
-                    {
-                        Description = result.API,
-                    }));
+            
             var nextOffSet = offset+resultsPerRequest>api.count ? "" : (offset+resultsPerRequest).ToString();
 
             await botClient.AnswerInlineQueryAsync(update.InlineQuery.Id, resultsToSend.ToArray(), null, false, nextOffSet);
@@ -231,51 +286,6 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
 
         }
 
+*/
 
 
-
-
-
-        await botClient.AnswerCallbackQueryAsync(callbackQueryId: "11");
-    }
-    catch(Exception ex)
-    {
-        await Console.Out.WriteLineAsync(ex.Message);
-        return;
-    }
-    
-    }
-
-async Task 
-static async Task HandleCallBackQuery(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
-{
-    ApiInfo api = FileService.GetApiInfo();
-
-    int offset = int.Parse(update.InlineQuery.Offset ?? "0");
-    int resultsPerRequest = 10;
-    var resultsToSend = new List<InlineQueryResult>();
-
-    api.entries.Skip(offset).Take(resultsPerRequest).ToList().ForEach(result =>
-        resultsToSend.Add(
-            item: new InlineQueryResultArticle(id: update.InlineQuery.Id, title: "Natija", inputMessageContent: null)
-            {
-                Description = result.API,
-            }));
-    var nextOffSet = offset + resultsPerRequest > api.count ? "" : (offset + resultsPerRequest).ToString();
-
-    await botClient.AnswerInlineQueryAsync(update.InlineQuery.Id, resultsToSend.ToArray(), null, false, nextOffSet);
-}
-
-
-Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
-    {
-    var ErrorMessage = exception switch
-    {
-        ApiRequestException apiRequestException
-            => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
-        _ => exception.ToString()
-    };
-
-    Console.WriteLine(ErrorMessage);
-    return Task.CompletedTask;
-}
