@@ -96,6 +96,31 @@ namespace TelegramBotDemo
 
             var resultToSend = new List<InlineQueryResult>();
 
+
+
+            var resultsToSend = new List<List<InlineKeyboardButton>>();
+
+            api.entries.Skip(startIndex).Take(resultsPerPage).ToList().ForEach(result =>
+            {
+                var button = InlineKeyboardButton.WithCallbackData(result.Description, result.API);
+                resultsToSend.Add(new List<InlineKeyboardButton> { button });
+            });
+            var btn_next = InlineKeyboardButton.WithCallbackData("Previous", $"prev_{page}");
+            var btn_prev = InlineKeyboardButton.WithCallbackData("Next", $"next_{page}");
+
+            resultsToSend.Add(new List<InlineKeyboardButton> { btn_prev });
+            resultsToSend.Add(new List<InlineKeyboardButton> { btn_next });
+
+            var inlineKeyboard = new InlineKeyboardMarkup(resultsToSend);
+
+
+
+
+
+
+
+
+
             api.entries.Skip(startIndex).Take(resultsPerPage).ToList().ForEach(result =>
                 resultToSend.Add(
                     item: new InlineQueryResultArticle(
@@ -104,14 +129,14 @@ namespace TelegramBotDemo
                     {
                         Description = result.Description,
                     }));
-            var inlineKeyboard = new InlineKeyboardMarkup(new[]
+            /*var inlineKeyboard = new InlineKeyboardMarkup(new[]
             {
                 new[]
                 {
                     InlineKeyboardButton.WithCallbackData("Previous", $"prev_{page}"),
                     InlineKeyboardButton.WithCallbackData("Next", $"next_{page}")
                 }
-            });
+            });*/
 
             if (messageId.HasValue)
             {
@@ -120,12 +145,7 @@ namespace TelegramBotDemo
             }
             else
             {
-                botClient.AnswerInlineQueryAsync(
-                    chatId.ToString(),
-                    results: resultToSend,
-                    isPersonal: true,
-                    cacheTime: 0
-                    );
+                
                 botClient.SendTextMessageAsync(
                     chatId,
                     $"Showing Page {page}",
