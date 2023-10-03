@@ -1,4 +1,6 @@
-﻿using Telegram.Bot;
+﻿using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -8,6 +10,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 using TelegramBotDemo;
 using TelegramBotDemo.Models;
 using VideoLibrary;
+using File = System.IO.File;
 
 namespace TelegramBotDemo
 {
@@ -19,7 +22,9 @@ namespace TelegramBotDemo
 
         static async Task Main(string[] args)
         {
-            const string TOKEN = "5911983733:AAEOQv0cQy5ITnaOUdYRRZDBywcEvRpgbms";
+            IConfiguration configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
+            
+            string TOKEN = configuration["TelegramToken"];
             botClient = new TelegramBotClient(TOKEN);
 
             var myBot = await botClient.GetMeAsync();
@@ -40,7 +45,7 @@ namespace TelegramBotDemo
             cts.Cancel();
 
         }
-
+        
         // StartReceiving does not block the caller thread. Receiving is done on the ThreadPool.
         static ReceiverOptions receiverOptions = new()
         {
@@ -197,6 +202,7 @@ namespace TelegramBotDemo
             _ = Task.CompletedTask;
         }
     }
+    
 }
 
 
