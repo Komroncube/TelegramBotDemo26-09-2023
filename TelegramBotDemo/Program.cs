@@ -16,6 +16,7 @@ namespace TelegramBotDemo
 {
     public class Program
     {
+        //webhook is coming
         static ITelegramBotClient botClient;
         static Dictionary<long, int> userPageTracker = new Dictionary<long, int>();
         static CancellationTokenSource cts;
